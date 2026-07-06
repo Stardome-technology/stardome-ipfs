@@ -1,0 +1,60 @@
+# ── Minimal SEAD auth stack for IPFS VPS ──────────────────────────────────
+# Usage:
+#   docker compose -f docker-compose.ipfs-auth.yml up -d
+#
+# Bootstrap:
+#   1. Register OrgGenesis event:
+#      curl -X POST http://localhost:8080/events \
+#        -H "Content-Type: application/cbor" \
+#        --data-binary @org_genesis.cbor
+#   2. Register EdgeAuthorization:
+#      curl -X POST http://localhost:8080/events \
+#        -H "Content-Type: application/cbor" \
+#        --data-binary @edge_auth.cbor
+#   3. Verify: curl http://localhost:8080/orgs/<org_id_hex>
+
+services:
+  sead-core:
+    image: ghcr.io/stardome-technology/stardome-sead/sead-core:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - sead_data:/data
+    environment:
+      - LOG_LEVEL=info
+      - SERVICE_NAME=sead-core
+    command: ["sead-core", "--port", "8080", "--db", "/data/sead.db"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - sead-network
+
+  auth-service:
+    image: ghcr.io/stardome-technology/stardome-sead/auth-service:latest
+    ports:
+      - "127.0.0.1:9000:8083"
+    environment:
+      - LOG_LEVEL=info
+      - SERVICE_NAME=auth-service
+      - AUTH_SEAD_CORE_BASE_URL=http://sead-core:8080
+      - AUTH_SKEW_TOLERANCE_SEC=30
+      - AUTH_KEY_CACHE_TTL_SEC=60
+    command: ["auth-service", "--port", "8083",
+              "--sead-core-url", "http://sead-core:8080",
+              "--skew-tolerance", "30",
+              "--cache-ttl", "60"]
+    depends_on:
+      sead-core:
+        condition: service_healthy
+    networks:
+      - sead-network
+
+volumes:
+  sead_data:
+
+networks:
+  sead-network:
+    driver: bridge
