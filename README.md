@@ -37,7 +37,7 @@ Deploy the minimal auth stack alongside your IPFS node to validate
 tokens against org public keys registered via SEAD DAG events.
 
 ```bash
-# Pull and start (no auth needed — images are public)
+# Pull and start
 docker compose -f docker-compose.ipfs-auth.yml pull
 docker compose -f docker-compose.ipfs-auth.yml up -d
 
@@ -45,6 +45,16 @@ docker compose -f docker-compose.ipfs-auth.yml up -d
 curl http://localhost:9000/health
 curl http://localhost:8080/health
 ```
+
+> **Note:** The images are published as public packages on ghcr.io.
+> However, some Docker environments may still return `denied` on anonymous pulls.
+> If you get an error, log in with a GitHub PAT first:
+>
+> ```bash
+> echo "$GITHUB_PAT" | docker login ghcr.io -u "$GITHUB_USERNAME" --password-stdin
+> ```
+>
+> The PAT needs only `read:packages` scope.
 
 The compose file (`docker-compose.ipfs-auth.yml`) runs two services:
 - **sead-core** — event store and org/edge key resolution
