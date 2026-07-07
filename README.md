@@ -2,6 +2,40 @@
 
 IPFS node deployment with SEAD-based authentication for pin operations.
 
+## Reference Implementation
+
+The Stardome IPFS node deployed at `ipfs.stardome.cloud` serves as the
+reference implementation. Third parties are free to build their IPFS nodes
+however they see fit, but nodes that match the following characteristics
+are guaranteed to be compatible with the SEAD auth stack and the Stardome
+ecosystem.
+
+### Key features of the reference node
+
+| Feature | Detail |
+|---|---|
+| **Kubo version** | `v0.42.0` (Linux amd64) |
+| **Init profile** | `server` (`ipfs init --profile server`) |
+| **Service manager** | `systemd` with dedicated `ipfs` user, `PrivateTmp=yes`, `NoNewPrivileges=yes` |
+| **Data directory** | Dedicated partition at `/mnt/data/ipfs` via `IPFS_PATH` |
+| **Storage cap** | 200 GB (`Datastore.StorageMax`) |
+| **GC interval** | 1 hour (`Datastore.GCPeriod`), enabled at daemon start (`--enable-gc`) |
+| **Relay** | Disabled (`Swarm.Transports.Network.Relay: false`, `Swarm.RelayClient.Enabled: false`) |
+| **Connection manager** | LowWater 100 / HighWater 200 |
+| **DHT provide interval** | 12 hours (`Provide.DHT.Interval: "12h"`) |
+| **API address** | `127.0.0.1:5001` (localhost only) |
+| **Gateway** | Disabled (all HTTP served through Nginx reverse proxy) |
+| **Rate limiting** | Per-org via Nginx `limit_req_zone` (10 req/s, burst 20) |
+| **Auth layer** | SEAD auth stack — Nginx `auth_request` subrequest to auth-service |
+
+These settings are not mandatory, but they represent a tested production
+configuration. If you deviate significantly, pay extra attention to
+security hardening, connection management, and garbage collection tuning.
+
+See [`ipfs_node/`](https://github.com/Stardome-technology/ipfs_node) for
+the full private reference repository with deployment scripts, service
+files, and Nginx config templates.
+
 ## Architecture
 
 ```
