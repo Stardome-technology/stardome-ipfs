@@ -37,7 +37,7 @@ Deploy the minimal auth stack alongside your IPFS node to validate
 tokens against org public keys registered via SEAD DAG events.
 
 ```bash
-# Pull and start (no auth needed — images are public)
+# Pull and start
 docker compose -f docker-compose.ipfs-auth.yml pull
 docker compose -f docker-compose.ipfs-auth.yml up -d
 
@@ -45,6 +45,16 @@ docker compose -f docker-compose.ipfs-auth.yml up -d
 curl http://localhost:9000/health
 curl http://localhost:8080/health
 ```
+
+> **Note:** The images are published as public packages on ghcr.io.
+> However, some Docker environments may still return `denied` on anonymous pulls.
+> If you get an error, log in with a GitHub PAT first:
+>
+> ```bash
+> echo "$GITHUB_PAT" | docker login ghcr.io -u "$GITHUB_USERNAME" --password-stdin
+> ```
+>
+> The PAT needs only `read:packages` scope.
 
 The compose file (`docker-compose.ipfs-auth.yml`) runs two services:
 - **sead-core** — event store and org/edge key resolution
@@ -67,17 +77,47 @@ location = /auth {
 
 ### Bootstrap genesis events
 
-Before auth works, register `OrgGenesis` and `EdgeAuthorization` events:
+The `OrgGenesis` and `EdgeAuthorization` events must already be registered in
+`sead-core` from your existing SEAD deployment. Verify they are present:
 
 ```bash
-curl -X POST http://localhost:8080/events \
-  -H "Content-Type: application/json" \
-  -d '{"envelope_hex": "<org_genesis_cbor_hex>"}'
+curl http://localhost:8080/orgs/<org_id_hex>
+# Expected: {"status":"active","org_pk_hex":"<pk>"}
 
-curl -X POST http://localhost:8080/events \
-  -H "Content-Type: application/json" \
-  -d '{"envelope_hex": "<edge_auth_cbor_hex>"}'
+curl http://localhost:8080/edges/<org_id_hex>/<edge_id_hex>
+# Expected: {"status":"authorized","edge_pk_hex":"<pk>"}
 ```
+
+If not, follow the [sead-service bootstrap guide](https://github.com/Stardome-technology/sead-service/blob/main/docs/bootstrap-genesis.md) first.
+
+## Token generation
+
+The auth stack only verifies tokens — it never generates them. You need signed
+tokens from an existing SEAD org. The org operator generates them on a secure
+laptop using the `gen-token` tool (see [sead-service docs](https://github.com/Stardome-technology/sead-service/blob/main/docs/bootstrap-genesis.md)):
+
+```bash
+# On the org's secure laptop (not the IPFS node):
+./build/tools/gen-token \
+  --org-id <org_id_hex> \
+  --org-signing-key <org_secret_key_hex> \
+  --org-public-key <org_public_key_hex> \
+  --payload-file artifact.cbor
+```
+
+The token is a single line of base64url-encoded CBOR. Transfer it to the
+IPFS node (e.g., via SSH pipe or mounted secret) and use it in API calls.
+
+### Prerequisites
+
+Before deploying this auth stack, you must have:
+
+1. **A running SEAD org** — sead-core with registered `OrgGenesis` and `EdgeAuthorization` events
+2. **The org_id** — the organization identifier (hex) from keygen output
+3. **A way to generate tokens** — the `gen-token` tool (see [sead-service](https://github.com/Stardome-technology/sead-service) docs) or an edge-service that holds the org signing key
+
+All of these come from an existing SEAD deployment. If you don't have them
+yet, follow the [sead-service bootstrap guide](https://github.com/Stardome-technology/sead-service/blob/main/docs/bootstrap-genesis.md) first.
 
 ### Usage example
 
