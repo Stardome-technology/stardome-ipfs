@@ -1,0 +1,11 @@
+# Runtime env (user-specific, not committed)
+.env
+
+# Build-only env (never committed)
+.env.build
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
