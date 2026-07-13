@@ -57,4 +57,5 @@ volumes:
 
 networks:
   sead-network:
+    name: sead-network
     driver: bridge
