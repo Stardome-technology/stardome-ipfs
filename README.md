@@ -111,15 +111,12 @@ location = /auth {
 
 ### Bootstrap genesis events
 
-The `OrgGenesis` and `EdgeAuthorization` events must already be registered in
+The `OrgGenesis` events must already be registered in
 `sead-core` from your existing SEAD deployment. Verify they are present:
 
 ```bash
 curl http://localhost:8080/orgs/<org_id_hex>
 # Expected: {"status":"active","org_pk_hex":"<pk>"}
-
-curl http://localhost:8080/edges/<org_id_hex>/<edge_id_hex>
-# Expected: {"status":"authorized","edge_pk_hex":"<pk>"}
 ```
 
 If not, follow the [sead-service bootstrap guide](https://github.com/Stardome-technology/sead-service/blob/main/docs/bootstrap-genesis.md) first.
@@ -136,7 +133,7 @@ laptop using the `gen-token` tool (see [sead-service docs](https://github.com/St
   --org-id <org_id_hex> \
   --org-signing-key <org_secret_key_hex> \
   --org-public-key <org_public_key_hex> \
-  --payload-file artifact.cbor
+  --payload-file payload.file
 ```
 
 The token is a single line of base64url-encoded CBOR. Transfer it to the
