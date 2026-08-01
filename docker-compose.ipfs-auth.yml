@@ -52,6 +52,32 @@ services:
     networks:
       - sead-network
 
+  # ── Pin Replicator ──────────────────────────────────────────────────────
+  # Lightweight HTTP service that establishes bilateral replication agreements.
+  # Each operator pins content from their own orgs; the replicator pushes CIDs
+  # to partner nodes under per-partner storage quotas.
+  # Connects to host IPFS via host.docker.internal (Docker on macOS/Windows)
+  # or host gateway IP (Linux).
+  pin-replicator:
+    image: ghcr.io/stardome-technology/stardome-sead/pin-replicator:latest
+    ports:
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - sead_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - LOG_LEVEL=info
+      - IPFS_API_URL=http://host.docker.internal:5001
+    command: ["pin-replicator",
+              "--port", "9001",
+              "--db", "/data/pin-replicator.db",
+              "--ipfs-api-url", "http://host.docker.internal:5001",
+              "--poll-interval", "30s",
+              "--verify-interval", "5m"]
+    networks:
+      - sead-network
+
 volumes:
   sead_data:
 
