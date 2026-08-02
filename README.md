@@ -32,9 +32,8 @@ These settings are not mandatory, but they represent a tested production
 configuration. If you deviate significantly, pay extra attention to
 security hardening, connection management, and garbage collection tuning.
 
-See [`ipfs_node/`](https://github.com/Stardome-technology/ipfs_node) for
-the full private reference repository with deployment scripts, service
-files, and Nginx config templates.
+See the **[setup guide](SETUP.md)** for step-by-step provisioning
+instructions (Nginx, Kubo, Docker, auth stack deployment).
 
 ## Architecture
 
