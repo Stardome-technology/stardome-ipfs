@@ -133,7 +133,7 @@ docker compose -f docker-compose.ipfs-auth.yml up -d
 
 # Health check
 curl http://localhost:9000/health
-curl http://localhost:8080/health
+curl http://localhost:30080/health
 ```
 
 > **Note:** The images are published as public packages on ghcr.io.
@@ -171,7 +171,7 @@ The `OrgGenesis` events must already be registered in
 `sead-core` from your existing SEAD deployment. Verify they are present:
 
 ```bash
-curl http://localhost:8080/orgs/<org_id_hex>
+curl http://localhost:30080/orgs/<org_id_hex>
 # Expected: {"status":"active","org_pk_hex":"<pk>"}
 ```
 
