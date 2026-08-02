@@ -45,7 +45,7 @@ Internet ──TLS──> Nginx :443
                     │                       (SEAD auth stack via Docker)
                     ├── /api/v0/(add|pin/add) ──proxy──> IPFS Kubo :5001
                     │                       (SEAD token auth via auth_request)
-                    ├── /pins ──proxy──> pin-replicator :9001
+                    ├── /pins ──proxy──> pin-replicator :32001
                     │                       (bilateral replication)
                     └── everything else ──> 403
 ```

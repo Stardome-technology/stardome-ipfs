@@ -4,20 +4,20 @@
 #
 # Bootstrap:
 #   1. Register OrgGenesis event:
-#      curl -X POST http://localhost:8080/events \
+#      curl -X POST http://localhost:30080/events \
 #        -H "Content-Type: application/cbor" \
 #        --data-binary @org_genesis.cbor
 #   2. Register EdgeAuthorization:
-#      curl -X POST http://localhost:8080/events \
+#      curl -X POST http://localhost:30080/events \
 #        -H "Content-Type: application/cbor" \
 #        --data-binary @edge_auth.cbor
-#   3. Verify: curl http://localhost:8080/orgs/<org_id_hex>
+#   3. Verify: curl http://localhost:30080/orgs/<org_id_hex>
 
 services:
   sead-core:
     image: ghcr.io/stardome-technology/stardome-sead/sead-core:latest
     ports:
-      - "8080:8080"
+      - "30080:8080"
     volumes:
       - sead_data:/data
     environment:
@@ -61,7 +61,7 @@ services:
   pin-replicator:
     image: ghcr.io/stardome-technology/stardome-sead/pin-replicator:latest
     ports:
-      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:32001:32001"
     volumes:
       - sead_data:/data
     extra_hosts:
@@ -70,7 +70,7 @@ services:
       - LOG_LEVEL=info
       - IPFS_API_URL=http://host.docker.internal:5001
     command: ["pin-replicator",
-              "--port", "9001",
+              "--port", "32001",
               "--db", "/data/pin-replicator.db",
               "--ipfs-api-url", "http://host.docker.internal:5001",
               "--poll-interval", "30s",
