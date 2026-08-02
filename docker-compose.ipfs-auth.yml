@@ -69,8 +69,7 @@ services:
     environment:
       - LOG_LEVEL=info
       - IPFS_API_URL=http://host.docker.internal:5001
-    command: ["pin-replicator",
-              "--port", "32001",
+    command: ["--port", "32001",
               "--db", "/data/pin-replicator.db",
               "--ipfs-api-url", "http://host.docker.internal:5001",
               "--poll-interval", "30s",
