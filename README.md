@@ -44,11 +44,67 @@ Internet ──TLS──> Nginx :443
                     ├── /auth ──proxy──> auth-service :9000/auth/verify
                     │                       (SEAD auth stack via Docker)
                     ├── /api/v0/(add|pin/add) ──proxy──> IPFS Kubo :5001
+                    │                       (SEAD token auth via auth_request)
+                    ├── /pins ──proxy──> pin-replicator :32001
+                    │                       (bilateral replication)
                     └── everything else ──> 403
 ```
 
 The authentication layer is provided by the **SEAD auth stack**
 (sead-core + auth-service running as Docker containers).
+
+## What gets pinned to IPFS
+
+When an attestation flows through the SEAD pipeline, only the **raw
+`stardome_attestation` CBOR bytes** are pinned to IPFS. The Merkle tree
+and inclusion proof are **not** pinned — they are the integrator's
+responsibility to store separately.
+
+### Pin size breakdown
+
+| Component | Size | Included in IPFS pin? |
+|-----------|------|-----------------------|
+| Module XMSSMT signature (OID 0x05) | ~18 KB | ✅ Inside attestation CBOR |
+| Module XMSSMT public key | ~4 KB | ✅ Inside attestation CBOR |
+| Merkle root (32 B) + payload hash (32 B) + metadata | ~100 B | ✅ Inside attestation CBOR |
+| **Total attestation CBOR pinned** | **~22-25 KB** | ✅ **This is what IPFS stores** |
+| Edge-service commit signature (OID 0x12) | ~2.8 KB | ❌ Goes to sead-core event store |
+| Edge-service auth token signature (OID 0x12) | ~2.8 KB | ❌ Ephemeral auth header only |
+| Merkle tree file | ~varies | ❌ Integrator's responsibility |
+| Inclusion proof | ~varies | ❌ Integrator's responsibility |
+
+### Pin format
+
+The bytes pinned to IPFS are **not** wrapped in any container format.
+They are the raw CBOR-encoded `stardome_attestation` as defined in
+[sead_v1.1.2.cddl](https://github.com/Stardome-technology/stardome-cbor-schemes/blob/main/sead_v1.1.2.cddl):
+
+```cddl
+stardome_attestation = {
+  ext_id:         bstr,    ; module identifier
+  xmss_pk:        bstr,    ; module XMSSMT public key
+  merkle_root:    bstr,    ; Merkle tree root (32 bytes)
+  xmss_sig:       bstr,    ; module XMSSMT signature
+  previous_att:   bstr,    ; previous attestation hash
+  counter:        uint,    ; attestation sequence number
+  schema_version: uint,    ; CDDL schema version
+}
+```
+
+### What is NOT pinned and why
+
+- **Edge-service commit signature** — posted to sead-core as a SEAD DAG
+  event (`edge_commit`). The verifier resolves it from the event store,
+  not from IPFS.
+- **Edge-service auth token signature** — generated per-pin, used as an
+  HTTP `Authorization` header, then discarded. It is ephemeral by design.
+- **Merkle tree** — the tree is produced by `stardome-client` during
+  attestation but is intentionally **not** sent to the edge-service or
+  pinned. The integrator is responsible for storing the tree file if
+  they need full Merkle proof verification. The verifier currently
+  checks `merkle_root == commitment_root` without requiring the full tree.
+- **Inclusion proof** — derived from the tree at verification time.
+  Not pinned because the tree itself is not pinned.
 
 ### Token format
 
@@ -77,7 +133,7 @@ docker compose -f docker-compose.ipfs-auth.yml up -d
 
 # Health check
 curl http://localhost:9000/health
-curl http://localhost:8080/health
+curl http://localhost:30080/health
 ```
 
 > **Note:** The images are published as public packages on ghcr.io.
@@ -111,15 +167,12 @@ location = /auth {
 
 ### Bootstrap genesis events
 
-The `OrgGenesis` and `EdgeAuthorization` events must already be registered in
+The `OrgGenesis` events must already be registered in
 `sead-core` from your existing SEAD deployment. Verify they are present:
 
 ```bash
-curl http://localhost:8080/orgs/<org_id_hex>
+curl http://localhost:30080/orgs/<org_id_hex>
 # Expected: {"status":"active","org_pk_hex":"<pk>"}
-
-curl http://localhost:8080/edges/<org_id_hex>/<edge_id_hex>
-# Expected: {"status":"authorized","edge_pk_hex":"<pk>"}
 ```
 
 If not, follow the [sead-service bootstrap guide](https://github.com/Stardome-technology/sead-service/blob/main/docs/bootstrap-genesis.md) first.
@@ -136,7 +189,7 @@ laptop using the `gen-token` tool (see [sead-service docs](https://github.com/St
   --org-id <org_id_hex> \
   --org-signing-key <org_secret_key_hex> \
   --org-public-key <org_public_key_hex> \
-  --payload-file artifact.cbor
+  --payload-file payload.file
 ```
 
 The token is a single line of base64url-encoded CBOR. Transfer it to the
