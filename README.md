@@ -258,6 +258,12 @@ Node A (Operator A)              Node B (Operator B)
 5. **Periodic verification** (default: 5min) checks that CIDs are still
    pinned on both nodes and re-pins if missing (e.g., after GC).
 
+> **Node-to-node block transfer.** When a partner receives `POST /pins`, it
+> pins the CID locally — Kubo fetches the actual blocks from the sender via
+> bitswap. This requires the two nodes to be directly reachable on the
+> swarm port and statically peered. See
+> [Establishing a partnership](#establishing-a-partnership).
+
 ### Deploying the pin-replicator
 
 The pin-replicator is included in `docker-compose.ipfs-auth.yml` and
@@ -285,13 +291,15 @@ are a small, stable set:
 | Call | Purpose |
 |------|---------|
 | `POST /api/v0/pin/ls?type=recursive` | list recursive pins |
-| `POST /api/v0/pin/add` | re-pin for GC resilience |
-| `POST /api/v0/pin/rm` | unpin |
-| `POST /api/v0/object/stat/<cid>` | CID size for quota |
+| `POST /api/v0/pin/add?arg=<cid>` | re-pin for GC resilience |
+| `POST /api/v0/pin/rm?arg=<cid>` | unpin |
+| `POST /api/v0/dag/stat?arg=<cid>` | CID size for quota |
 
 > **POST-only:** Kubo's HTTP API rejects `GET /api/v0/...` with `405`
 > (`Allow: OPTIONS, POST`) since Kubo v0.5.0 as browser CSRF protection.
-> All four calls use `POST`.
+> All four calls use `POST`, and each passes its argument as a query
+> parameter (`?arg=...`) — Kubo's RPC API does **not** read arguments from
+> a JSON body.
 
 This coupling is **chosen, not accidental**: the reference nodes are Kubo,
 and the RPC surface is tiny and stable. The operator-facing flexibility
@@ -313,6 +321,54 @@ is contained to that file.
 
 To set up replication between Node A and Node B, each node must register
 the other as a partner using the **same shared secret**.
+
+> **Prerequisite — the two nodes must be able to exchange blocks.**
+> The replicator only pushes the *CID* over HTTPS (`POST /pins`); the
+> receiver fetches the actual blocks from the sender via **bitswap** on
+> the libp2p swarm. That requires:
+>
+> 1. **Swarm port reachable between the two nodes** (default TCP/4001, plus
+>    UDP/4001 for QUIC if enabled). Open it in the cloud provider firewall
+>    *and* any host firewall, restricted to the partner's IP:
+>    ```bash
+>    # On each node, allow the partner's public IP on the swarm port
+>    sudo ufw allow from <partner_public_ip> to any port 4001 proto tcp
+>    sudo ufw allow from <partner_public_ip> to any port 4001 proto udp
+>    ```
+>    Verify with `nc -vz -w 5 <partner_host> 4001` — must report `succeeded`
+>    quickly.
+>
+> 2. **Static peering between the two nodes.** The replicator does not
+>    establish libp2p connections — it only orchestrates pins. With the
+>    reference config (`Provide.DHT.Interval: 12h`), a newly pinned CID has
+>    no fresh provider record, and the nodes won't naturally dial each other
+>    without shared bootstraps or mDNS. Add each node to the other's
+>    `Peering.Peers` so they maintain a permanent direct connection (bitswap
+>    then always has the sender reachable):
+>
+>    ```bash
+>    # Get the other node's peer ID (on each node):
+>    ipfs id
+>
+>    # On Node A — peer with Node B:
+>    ipfs config --json Peering.Peers '[
+>      {"ID": "<node_b_peer_id>", "Addrs": ["/ip4/<node_b_public_ip>/tcp/4001"]}
+>    ]'
+>
+>    # On Node B — peer with Node A:
+>    ipfs config --json Peering.Peers '[
+>      {"ID": "<node_a_peer_id>", "Addrs": ["/ip4/<node_a_public_ip>/tcp/4001"]}
+>    ]'
+>
+>    # Restart the daemon on both nodes, then confirm each sees the other:
+>    ipfs swarm peers | grep <partner_peer_id>
+>    ```
+>
+>    > `Peering.Peers` is additive — nothing in the reference config needs
+>    > to be removed. It complements `Provide.DHT` (which keeps content
+>    > discoverable on the public DHT) and does not use relays, so it's
+>    > compatible with `Swarm.RelayClient.Enabled: false`. Kubo exempts
+>    > peered nodes from connection-manager pruning.
 
 Generate a strong random secret:
 
