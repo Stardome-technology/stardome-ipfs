@@ -348,7 +348,7 @@ the other as a partner using the **same shared secret**.
 >
 >    ```bash
 >    # Get the other node's peer ID (on each node):
->    ipfs id | head -1
+>    ipfs id
 >
 >    # On Node A — peer with Node B:
 >    ipfs config --json Peering.Peers '[
