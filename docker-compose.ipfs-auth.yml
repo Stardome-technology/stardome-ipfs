@@ -66,8 +66,7 @@ services:
     environment:
       - LOG_LEVEL=info
       - IPFS_API_URL=http://127.0.0.1:5001
-    command: ["/app/pin-replicator",
-              "--port", "32001",
+    command: ["--port", "32001",
               "--db", "/data/pin-replicator.db",
               "--ipfs-api-url", "http://127.0.0.1:5001",
               "--poll-interval", "30s",
