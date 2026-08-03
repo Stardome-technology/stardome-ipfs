@@ -272,8 +272,42 @@ curl http://localhost:32001/health
 ```
 
 The replicator connects to the local IPFS Kubo instance via
-`host.docker.internal:5001`. On Linux, Docker's `host-gateway` resolves
-this to the host's loopback interface automatically.
+`127.0.0.1:5001`. In `docker-compose.ipfs-auth.yml` it runs with
+`network_mode: host`, so it shares the host's network namespace and reaches
+the host Kubo API on its loopback address directly.
+
+#### Replicator ↔ IPFS contract (deliberate Kubo coupling)
+
+The replicator talks to the local node over **Kubo RPC** (`/api/v0/*`),
+which in practice is the de-facto universal IPFS HTTP wire API. The calls
+are a small, stable set:
+
+| Call | Purpose |
+|------|---------|
+| `POST /api/v0/pin/ls?type=recursive` | list recursive pins |
+| `POST /api/v0/pin/add` | re-pin for GC resilience |
+| `POST /api/v0/pin/rm` | unpin |
+| `POST /api/v0/object/stat/<cid>` | CID size for quota |
+
+> **POST-only:** Kubo's HTTP API rejects `GET /api/v0/...` with `405`
+> (`Allow: OPTIONS, POST`) since Kubo v0.5.0 as browser CSRF protection.
+> All four calls use `POST`.
+
+This coupling is **chosen, not accidental**: the reference nodes are Kubo,
+and the RPC surface is tiny and stable. The operator-facing flexibility
+("host your node however you like") concerns *how* the node is hosted, not
+the replicator's wire protocol.
+
+If a future requirement hardens against non-Kubo nodes, the unwind path is
+to swap this seam for the implementation-agnostic
+[IPFS Pinning Service API (IPIP-0373)](https://ipfs.github.io/specs/pinning/):
+add a pinning-service adapter and point the replicator at it. The four
+calls above are centralized in `tools/pin-replicator/main.go`, so the swap
+is contained to that file.
+
+> **Kubo RPC is POST-only.** The Kubo HTTP API rejects `GET /api/v0/...` with
+> `405 Method Not Allowed` (`Allow: OPTIONS, POST`) since Kubo v0.5.0, as a
+> browser CSRF protection. The replicator therefore calls Kubo with `POST`.
 
 ### Establishing a partnership
 
@@ -473,7 +507,7 @@ location /pins/health {
 |------|---------|-------------|
 | `--port` | `32001` | HTTP listen port |
 | `--db` | `/data/pin-replicator.db` | SQLite database path |
-| `--ipfs-api-url` | `http://host.docker.internal:5001` | IPFS Kubo API URL |
+| `--ipfs-api-url` | `http://127.0.0.1:5001` | IPFS Kubo API URL |
 | `--poll-interval` | `30s` | Interval to poll local IPFS for new pins |
 | `--verify-interval` | `5m` | Interval to verify partner replication |
 
