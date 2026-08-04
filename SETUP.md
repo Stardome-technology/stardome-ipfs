@@ -4,9 +4,24 @@ This guide walks through provisioning a production IPFS node with SEAD
 authentication from scratch. It covers Nginx, Kubo IPFS, Docker, and the
 SEAD auth stack.
 
-> **Prerequisites:** A Linux server (Ubuntu 22.04+ recommended) with
+> **Prerequisites:** A Linux server (tested on Ubuntu 26.04) with
 > root access, a public IP, and a DNS A record pointing `ipfs.<yourdomain>`
 > to that IP. Firewall must allow TCP/80 and TCP/443.
+
+## Public ports to open
+
+Before provisioning, open these ports on the host firewall (and any cloud
+security group):
+
+- **`80/tcp`** — HTTP (for Let's Encrypt / certbot HTTP-01 challenge)
+- **`443/tcp`** — HTTPS (Nginx reverse proxy — all client API and pin traffic)
+- **`4001/tcp`** — IPFS swarm (libp2p TCP — block exchange between nodes)
+- **`4001/udp`** — IPFS swarm (QUIC, if enabled)
+
+All other service ports (Kubo API `5001`, auth-service `9000`, sead-core
+`30080`, pin-replicator `32001`) are bound to localhost / the Docker network
+and should **not** be exposed publicly. For bilateral replication, restrict
+inbound `4001` to your partner nodes' IPs.
 
 ---
 

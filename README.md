@@ -52,6 +52,20 @@ Internet ──TLS──> Nginx :443
 The authentication layer is provided by the **SEAD auth stack**
 (sead-core + auth-service running as Docker containers).
 
+## Public ports to open
+
+For an integrator deploying an IPFS node, these are the ports that must be
+reachable from outside (open in the firewall / cloud security group):
+
+- **`443/tcp`** — HTTPS (Nginx reverse proxy — all client API and pin traffic)
+- **`4001/tcp`** — IPFS swarm (libp2p TCP — block exchange between nodes)
+- **`4001/udp`** — IPFS swarm (QUIC, if enabled)
+
+Everything else (Kubo API `5001`, auth-service `9000`, sead-core `30080`,
+pin-replicator `32001`) is bound to localhost / the Docker network and should
+**not** be exposed publicly. For bilateral replication, restrict inbound `4001`
+to your partner nodes' IPs.
+
 ## What gets pinned to IPFS
 
 When an attestation flows through the SEAD pipeline, only the **raw
