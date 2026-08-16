@@ -26,7 +26,7 @@ ecosystem.
 | **API address** | `127.0.0.1:5001` (localhost only) |
 | **Gateway** | Disabled (all HTTP served through Nginx reverse proxy) |
 | **Rate limiting** | Per-org via Nginx `limit_req_zone` (10 req/s, burst 20) |
-| **Auth layer** | SEAD auth stack — Nginx `auth_request` subrequest to auth-service |
+| **Auth layer** | SEAD auth stack — Nginx `auth_request` subrequest to the gateway |
 
 These settings are not mandatory, but they represent a tested production
 configuration. If you deviate significantly, pay extra attention to
@@ -40,7 +40,7 @@ instructions (Nginx, Kubo, Docker, auth stack deployment).
 ```
 Internet ──TLS──> Nginx :443
                     │
-                    ├── /auth ──proxy──> auth-service :9000/auth/verify
+                    ├── /auth ──proxy──> gateway :30080/auth/verify
                     │                       (SEAD auth stack via Docker)
                     ├── /api/v0/(add|pin/add) ──proxy──> IPFS Kubo :5001
                     │                       (SEAD token auth via auth_request)
@@ -50,7 +50,9 @@ Internet ──TLS──> Nginx :443
 ```
 
 The authentication layer is provided by the **SEAD auth stack**
-(sead-core + auth-service running as Docker containers).
+(sead-core + gateway running as Docker containers). The gateway serves
+`/auth/verify` (collapsed from auth-service) and proxies `/events`, `/orgs/{id}`
+to sead-core over gRPC.
 
 ## Public ports to open
 
@@ -61,10 +63,10 @@ reachable from outside (open in the firewall / cloud security group):
 - **`4001/tcp`** — IPFS swarm (libp2p TCP — block exchange between nodes)
 - **`4001/udp`** — IPFS swarm (QUIC, if enabled)
 
-Everything else (Kubo API `5001`, auth-service `9000`, sead-core `30080`,
-pin-replicator `32001`) is bound to localhost / the Docker network and should
-**not** be exposed publicly. For bilateral replication, restrict inbound `4001`
-to your partner nodes' IPs.
+Everything else (Kubo API `5001`, gateway `30080`, pin-replicator `32001`)
+is bound to localhost / the Docker network and should **not** be exposed
+publicly. For bilateral replication, restrict inbound `4001` to your partner
+nodes' IPs.
 
 ## What gets pinned to IPFS
 
@@ -145,8 +147,8 @@ docker compose -f docker-compose.ipfs-auth.yml pull
 docker compose -f docker-compose.ipfs-auth.yml up -d
 
 # Health check
-curl http://localhost:9000/health
-curl http://localhost:30080/health
+curl http://localhost:30080/health    # gateway (auth/verify + proxy)
+curl http://localhost:32001/health    # pin-replicator
 ```
 
 > **Note:** The images are published as public packages on ghcr.io.
@@ -160,8 +162,8 @@ curl http://localhost:30080/health
 > The PAT needs only `read:packages` scope.
 
 The compose file (`docker-compose.ipfs-auth.yml`) runs three services:
-- **sead-core** — event store and org/edge key resolution
-- **auth-service** — token verification endpoint for Nginx `auth_request`
+- **sead-core** — event store and org/edge key resolution (gRPC-only)
+- **gateway** — serves `/auth/verify` for Nginx `auth_request`; proxies `/events`, `/orgs/{id}` to sead-core over gRPC
 - **pin-replicator** — bilateral pin replication between node operators
 
 ### Nginx config
@@ -171,7 +173,7 @@ Add this location block to your IPFS site config:
 ```
 location = /auth {
     internal;
-    proxy_pass http://127.0.0.1:9000/auth/verify$is_args$args;
+    proxy_pass http://127.0.0.1:30080/auth/verify$is_args$args;
     proxy_pass_request_body off;
     proxy_set_header Content-Length "";
     proxy_set_header Authorization $http_authorization;

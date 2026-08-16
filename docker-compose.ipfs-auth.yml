@@ -12,43 +12,54 @@
 #        -H "Content-Type: application/cbor" \
 #        --data-binary @edge_auth.cbor
 #   3. Verify: curl http://localhost:30080/orgs/<org_id_hex>
+#
+# Phase 4.4: sead-core is gRPC-only (no public HTTP port). The gateway is the
+# single entry point: it serves /auth/verify (collapsed from auth-service) and
+# proxies /events, /orgs/{id} to sead-core over gRPC. The gateway listens on
+# 127.0.0.1:30080 — Nginx is the public entry (443) and proxies auth_request
+# to it. The pin-replicator runs with host networking to reach Kubo on
+# 127.0.0.1:5001.
 
 services:
   sead-core:
     image: ghcr.io/stardome-technology/stardome-sead/sead-core:latest
-    ports:
-      - "30080:8080"
+    # No public ports — gRPC-only, reachable on sead-network via the gateway
     volumes:
       - sead_data:/data
     environment:
       - LOG_LEVEL=info
       - SERVICE_NAME=sead-core
-    command: ["sead-core", "--port", "8080", "--db", "/data/sead.db"]
+    command: ["sead-core", "--port", "50051", "--db", "/data/sead.db", "--fake-verification"]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 15s
       timeout: 5s
       retries: 3
     networks:
       - sead-network
 
-  auth-service:
-    image: ghcr.io/stardome-technology/stardome-sead/auth-service:latest
+  gateway:
+    image: ghcr.io/stardome-technology/stardome-sead-gateway:latest
     ports:
-      - "127.0.0.1:9000:8083"
+      - "127.0.0.1:30080:30080"
     environment:
-      - LOG_LEVEL=info
-      - SERVICE_NAME=auth-service
-      - AUTH_SEAD_CORE_BASE_URL=http://sead-core:8080
-      - AUTH_SKEW_TOLERANCE_SEC=30
-      - AUTH_KEY_CACHE_TTL_SEC=60
-    command: ["auth-service", "--port", "8083",
-              "--sead-core-url", "http://sead-core:8080",
-              "--skew-tolerance", "30",
-              "--cache-ttl", "60"]
+      - GATEWAY_TLS_ENABLED=false
+      - GATEWAY_AUTH_ENABLED=true
+      - GATEWAY_AUTH_CBOR_ENABLED=true
+      - GATEWAY_AUTH_CBOR_CACHE_TTL=60
+      - GATEWAY_AUTH_CBOR_SKEW_TOLERANCE=30
+      - GATEWAY_METRICS_ENABLED=false
+      - SVC_SEAD_CORE_GRPC=sead-core:50051
+      - SVC_SEAD_CORE=http://sead-core:50051
+      - GATEWAY_GRPC_PORT=50054
     depends_on:
       sead-core:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:30080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - sead-network
 
