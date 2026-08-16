@@ -13,7 +13,7 @@
 #        --data-binary @edge_auth.cbor
 #   3. Verify: curl http://localhost:30080/orgs/<org_id_hex>
 #
-# Phase 4.4: sead-core is gRPC-only (no public HTTP port). The gateway is the
+# Go Gateway migration phase 4.4: sead-core is gRPC-only (no public HTTP port). The gateway is the
 # single entry point: it serves /auth/verify (collapsed from auth-service) and
 # proxies /events, /orgs/{id} to sead-core over gRPC. The gateway listens on
 # 127.0.0.1:30080 — Nginx is the public entry (443) and proxies auth_request
