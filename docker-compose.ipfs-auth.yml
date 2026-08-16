@@ -52,6 +52,9 @@ services:
       - SVC_SEAD_CORE_GRPC=sead-core:50051
       - SVC_SEAD_CORE=http://sead-core:50051
       - GATEWAY_GRPC_PORT=50054
+      # This minimal stack runs only sead-core; probe just it so /health
+      # reports healthy instead of degraded for the absent edge/storage/source-data.
+      - GATEWAY_HEALTH_BACKENDS=sead-core
     depends_on:
       sead-core:
         condition: service_healthy
