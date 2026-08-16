@@ -18,10 +18,10 @@ security group):
 - **`4001/tcp`** — IPFS swarm (libp2p TCP — block exchange between nodes)
 - **`4001/udp`** — IPFS swarm (QUIC, if enabled)
 
-All other service ports (Kubo API `5001`, auth-service `9000`, sead-core
-`30080`, pin-replicator `32001`) are bound to localhost / the Docker network
-and should **not** be exposed publicly. For bilateral replication, restrict
-inbound `4001` to your partner nodes' IPs.
+All other service ports (Kubo API `5001`, gateway `30080`, pin-replicator
+`32001`) are bound to localhost / the Docker network and should **not** be
+exposed publicly. For bilateral replication, restrict inbound `4001` to your
+partner nodes' IPs.
 
 ---
 
@@ -71,9 +71,11 @@ server {
     client_max_body_size 10M;
 
     # --- AUTH SUBREQUEST ---
+    # The gateway (collapsed from auth-service) serves /auth/verify on
+    # 127.0.0.1:30080. It resolves org keys from sead-core over gRPC.
     location = /auth {
         internal;
-        proxy_pass http://127.0.0.1:9000/auth/verify$is_args$args;
+        proxy_pass http://127.0.0.1:30080/auth/verify$is_args$args;
         proxy_pass_request_body off;
         proxy_set_header Content-Length "";
         proxy_set_header Authorization $http_authorization;
@@ -272,8 +274,8 @@ docker compose -f docker-compose.ipfs-auth.yml pull
 docker compose -f docker-compose.ipfs-auth.yml up -d
 
 # Verify
-curl http://localhost:30080/health
-curl http://localhost:9000/health
+curl http://localhost:30080/health    # gateway (auth/verify + proxy)
+curl http://localhost:32001/health    # pin-replicator
 ```
 
 > **Note:** The images are published as public packages on ghcr.io.
@@ -286,9 +288,9 @@ curl http://localhost:9000/health
 
 ### Register an organization
 
-The auth-service needs to know your org's public key to verify tokens.
+The gateway needs to know your org's public key to verify tokens.
 Generate the genesis envelope on a **secure machine** (not the IPFS node),
-then POST it to the local sead-core.
+then POST it to the local sead-core via the gateway.
 
 #### Generate the envelope (on a secure machine)
 
