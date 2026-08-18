@@ -43,6 +43,11 @@ services:
     ports:
       - "127.0.0.1:30080:30080"
     environment:
+      # No GATEWAY_AUTH_SECRET is set here BY DESIGN: the bearer layer is left
+      # open so Nginx can be the public entry (443) and enforce auth via
+      # auth_request -> gateway /auth/verify using a CBOR auth token (org
+      # XMSS-signed). Cross-org trust comes from the SEAD DAG (org/edge
+      # authorization events), not a shared transport token.
       - GATEWAY_TLS_ENABLED=false
       - GATEWAY_AUTH_ENABLED=true
       - GATEWAY_AUTH_CBOR_ENABLED=true
