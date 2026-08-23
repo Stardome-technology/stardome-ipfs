@@ -319,6 +319,8 @@ docker run --rm -v "$(pwd):/data" \
 Copy `envelope.hex` to the IPFS node, then:
 
 ```bash
+# This IPFS auth stack does NOT set SEAD_AUTH_SECRET (gateway is localhost-only;
+# Nginx is the public auth enforcement point), so no Authorization header is needed.
 curl -X POST http://localhost:30080/events \
   -H "Content-Type: application/json" \
   -d "{\"envelope_hex\": \"$(cat envelope.hex)\"}"
@@ -327,6 +329,7 @@ curl -X POST http://localhost:30080/events \
 #### Verify
 
 ```bash
+# No Authorization header needed here (see note above).
 curl http://localhost:30080/orgs/<org_id_hex>
 # Expected: {"status":"active","org_pk_hex":"<pk>"}
 ```

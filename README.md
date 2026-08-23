@@ -187,11 +187,22 @@ The `OrgGenesis` events must already be registered in
 `sead-core` from your existing SEAD deployment. Verify they are present:
 
 ```bash
+# This IPFS auth stack does NOT set SEAD_AUTH_SECRET (the gateway is
+# localhost-only; Nginx is the public auth enforcement point), so no
+# Authorization header is needed here.
 curl http://localhost:30080/orgs/<org_id_hex>
 # Expected: {"status":"active","org_pk_hex":"<pk>"}
 ```
 
 If not, follow the [sead-service bootstrap guide](https://github.com/Stardome-technology/sead-service/blob/main/docs/bootstrap-genesis.md) first.
+
+> **Note on the bootstrap guide's `Authorization` header:** the linked
+> `sead-service` bootstrap guide shows `-H "Authorization: Bearer $SEAD_AUTH_SECRET"`
+> because it targets a standalone gateway that sets `SEAD_AUTH_SECRET`. This IPFS
+> auth stack deliberately leaves that secret unset (see `docker-compose.ipfs-auth.yml`),
+> so the header is **not** required here. If you ever set `SEAD_AUTH_SECRET` on this
+> gateway (e.g. to expose it beyond localhost), add the header to the bootstrap
+> commands too.
 
 ## Token generation
 
