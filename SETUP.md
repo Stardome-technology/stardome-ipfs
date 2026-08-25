@@ -339,24 +339,20 @@ curl http://localhost:30080/orgs/<org_id_hex>
 
 ---
 
-## 4.1 Clients pinning to this node (storage-gateway TLS)
+## 4.1 Clients pinning to this node (pin-service TLS)
 
-A SEAD **storage-gateway** (on an organization infrastructure) pins artifacts to this
-IPFS node by calling `POST https://ipfs.<yourdomain>/api/v0/add` with a CBOR
+A SEAD **pin-service** (Go, running on an organization infrastructure) pins artifacts to this
+IPFS node by calling `POST https://ipfs.<yourdomain>/api/v0/add` with a Bearer
 auth token. Because this endpoint is served by Nginx with a **Let's Encrypt**
-certificate (or any other public CA one), the storage-gateway's HTTP client must trust the **public CA
+certificate (or any other public CA one), the pin-service's HTTP client must trust the **public CA
 bundle** — it does **not** need your private CA.
 
-- The storage-gateway's `IpfsClient` (C++ `httplib`) must set the system CA
-  bundle explicitly:
-  ```cpp
-  cli.set_ca_cert_path("/etc/ssl/certs/ca-certificates.crt");
-  cli.enable_server_certificate_verification(true);
-  ```
-  (httplib's default verify-paths lookup is unreliable in minimal containers;
-  without this it fails with `SSL server verification failed`.)
+- The pin-service uses Go's `net/http` client with a 60-second timeout. It sends
+  the auth token in the `Authorization: Bearer <token>` header. Go's default CA
+  bundle is used automatically — no explicit CA path configuration is needed.
 - If you deploy this IPFS node behind a **private CA** instead of public one,
-  point the storage-gateway at that CA bundle instead of the system one.
+  configure the pin-service to trust that CA bundle (e.g. via `SSL_CERT_FILE`
+  env var or system CA installation).
 - The POC's local CA is **not** needed here — this node presents a public cert.
 
 ---
