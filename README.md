@@ -242,6 +242,24 @@ curl -X POST \
   "https://ipfs.yourdomain.com/api/v0/add"
 ```
 
+### Client TLS trust (storage-gateway / integrator nodes)
+
+This node's `/api/v0/add` is served by Nginx with a **Let's Encrypt** (or any public CA) cert.
+A SEAD **storage-gateway** (on an organization infrastructure) pins artifacts here
+over HTTPS and must trust the **public CA bundle** — it does **not** need your
+private CA. The storage-gateway's `IpfsClient` (C++ `httplib`) must set the
+system CA bundle explicitly:
+
+```cpp
+cli.set_ca_cert_path("/etc/ssl/certs/ca-certificates.crt");
+cli.enable_server_certificate_verification(true);
+```
+
+Without this, httplib fails with `SSL server verification failed` (its default
+verify-paths lookup is unreliable in minimal containers) and the edge pin loop
+reports `AddToIPFS -> 502`. If you deploy this node behind a **private CA**
+instead of public one, point the storage-gateway at that CA bundle instead.
+
 ---
 
 ## Bilateral Pin Replication

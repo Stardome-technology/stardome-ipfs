@@ -339,6 +339,28 @@ curl http://localhost:30080/orgs/<org_id_hex>
 
 ---
 
+## 4.1 Clients pinning to this node (storage-gateway TLS)
+
+A SEAD **storage-gateway** (on an organization infrastructure) pins artifacts to this
+IPFS node by calling `POST https://ipfs.<yourdomain>/api/v0/add` with a CBOR
+auth token. Because this endpoint is served by Nginx with a **Let's Encrypt**
+certificate (or any other public CA one), the storage-gateway's HTTP client must trust the **public CA
+bundle** — it does **not** need your private CA.
+
+- The storage-gateway's `IpfsClient` (C++ `httplib`) must set the system CA
+  bundle explicitly:
+  ```cpp
+  cli.set_ca_cert_path("/etc/ssl/certs/ca-certificates.crt");
+  cli.enable_server_certificate_verification(true);
+  ```
+  (httplib's default verify-paths lookup is unreliable in minimal containers;
+  without this it fails with `SSL server verification failed`.)
+- If you deploy this IPFS node behind a **private CA** instead of public one,
+  point the storage-gateway at that CA bundle instead of the system one.
+- The POC's local CA is **not** needed here — this node presents a public cert.
+
+---
+
 ## 5. Next steps
 
 - **Generate tokens** — see the [Token generation](README.md#token-generation) section in the main README
