@@ -56,6 +56,12 @@ services:
       - GATEWAY_METRICS_ENABLED=false
       - SVC_SEAD_CORE_GRPC=sead-core:50051
       - SVC_SEAD_CORE=http://sead-core:50051
+      # No storage backend in this minimal auth-only stack: the gateway is a
+      # pure router and would default SVC_STORAGE_GRPC to pin-service:50056
+      # (absent here). Empty disables the storage/verify-pin surface
+      # gracefully (no lazy dial to a missing pin-service). IPFS pinning is
+      # done by the host Kubo + Nginx, not via the gateway /pin /cid/.
+      - SVC_STORAGE_GRPC=
       - GATEWAY_GRPC_PORT=50054
       # This minimal stack runs only sead-core; probe just it so /health
       # reports healthy instead of degraded for the absent edge/storage/source-data.
