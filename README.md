@@ -147,8 +147,10 @@ docker compose -f docker-compose.ipfs-auth.yml pull
 docker compose -f docker-compose.ipfs-auth.yml up -d
 
 # Health check
-curl http://localhost:30080/health    # gateway (auth/verify + proxy)
-curl http://localhost:32001/health    # pin-replicator
+# gateway (auth/verify + proxy)
+curl http://localhost:30080/health
+# pin-replicator
+curl http://localhost:32001/health
 ```
 
 > **Note:** The images are published as public packages on ghcr.io.
