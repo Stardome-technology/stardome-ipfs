@@ -14,16 +14,16 @@ ecosystem.
 
 | Feature | Detail |
 |---|---|
-| **Kubo version** | `v0.42.0` (Linux amd64) |
-| **Init profile** | `server` (`ipfs init --profile server`) |
-| **Service manager** | `systemd` with dedicated `ipfs` user, `PrivateTmp=yes`, `NoNewPrivileges=yes` |
-| **Data directory** | Dedicated partition at `/mnt/data/ipfs` via `IPFS_PATH` |
+| **Kubo version** | Official Docker image [`ipfs/kubo:latest`](https://hub.docker.com/r/ipfs/kubo) (pin `vN.N.N` to hold a release) |
+| **Init profile** | `server` (`IPFS_PROFILE=server` on first init) |
+| **Service manager** | Docker restart policy (`--restart unless-stopped`) |
+| **Data directory** | Host volume `/mnt/data/ipfs` → `/data/ipfs` in the container (UID 1000) |
 | **Storage cap** | 200 GB (`Datastore.StorageMax`) |
 | **GC interval** | 1 hour (`Datastore.GCPeriod`), enabled at daemon start (`--enable-gc`) |
 | **Relay** | Disabled (`Swarm.Transports.Network.Relay: false`, `Swarm.RelayClient.Enabled: false`) |
 | **Connection manager** | LowWater 100 / HighWater 200 |
 | **DHT provide interval** | 12 hours (`Provide.DHT.Interval: "12h"`) |
-| **API address** | `127.0.0.1:5001` (localhost only) |
+| **API address** | `127.0.0.1:5001` on the host loopback (host-network container) |
 | **Gateway** | Disabled (all HTTP served through Nginx reverse proxy) |
 | **Rate limiting** | Per-org via Nginx `limit_req_zone` (10 req/s, burst 20) |
 | **Auth layer** | SEAD auth stack — Nginx `auth_request` subrequest to the gateway |
@@ -135,6 +135,29 @@ CBOR map with:
 
 Token is **base64url-encoded** CBOR (`RFC 4648 §5`, no padding) and passed
 as `Authorization: Bearer <token>`.
+
+## Retrieval model (verification)
+
+This node is a **pinning backend, not a public content gateway**. The
+Nginx mapping intentionally exposes **only** `POST /api/v0/add` and
+`POST /api/v0/pin/add` (SEAD-token authenticated). Every other RPC —
+`cat`, `pin/ls`, `block/stat`, `id`, `version` — returns `403` by
+design.
+
+**Do not build verification flows that `cat` from the IPFS node.** The
+intended retrieval model for verifiers — whether internal SEAD components
+or external verifier parties — is:
+
+1. The attestation bytes come **from the signer** out-of-band, or via the
+   SEAD gateway's **controlled disclosure** (`POST /disclosure/request`).
+2. The verifier checks the attestation signature and binds it to the
+   `merkle_root` / CID recorded in the `edge_commit` event on the SEAD
+   DAG. Anyone holding the source data can verify the signature themselves.
+
+The `cat` path exists only as an **internal storage hop** (gateway →
+pin-service → Kubo over the trusted network) and is not part of this
+node's public contract. A `403` on `cat` is the correct, expected
+response — not a misconfiguration, and not "node down".
 
 ## SEAD Auth Stack
 
