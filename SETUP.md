@@ -142,7 +142,37 @@ sudo systemctl reload nginx
 
 ---
 
-## 2. Kubo IPFS (official Docker image)
+## 2. Docker
+
+Install Docker Engine:
+
+```bash
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+sudo usermod -aG docker $USER
+```
+
+Log out and back in for the group change to take effect.
+
+---
+
+## 3. Kubo IPFS (official Docker image)
 
 Run Kubo from the **official Docker image**
 [`ipfs/kubo`](https://hub.docker.com/r/ipfs/kubo) — the supported
@@ -155,7 +185,7 @@ host-level service management.
 > a specific version for reproducibility, use `ipfs/kubo:v0.43.1` (or
 > any `vN.N.N` tag).
 >
-> **Prerequisite:** Docker Engine — see [section 3](#3-docker) — must be
+> **Prerequisite:** Docker Engine — see [section 2](#2-docker) — must be
 > installed before starting the node.
 
 ### Prepare the data directory
@@ -239,36 +269,6 @@ docker rm -f ipfs
 # re-run the `docker run` command above — the repo persists in the volume
 docker logs -f ipfs
 ```
-
----
-
-## 3. Docker
-
-Install Docker Engine:
-
-```bash
-sudo apt update
-sudo apt install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-
-sudo apt update
-sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-sudo usermod -aG docker $USER
-```
-
-Log out and back in for the group change to take effect.
 
 ---
 
@@ -371,4 +371,4 @@ bundle** — it does **not** need your private CA.
 
 - **Generate tokens** — see the [Token generation](README.md#token-generation) section in the main README
 - **Set up bilateral replication** — see the [Bilateral Pin Replication](README.md#bilateral-pin-replication) section
-- **Monitor the node** — use `journalctl -u ipfs -f` and `docker compose logs -f`
+- **Monitor the node** — use `docker logs -f ipfs` (and `docker compose logs -f` for the SEAD auth stack)
