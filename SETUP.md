@@ -161,14 +161,24 @@ host-level service management.
 ### Prepare the data directory
 
 The repo lives on the dedicated data partition and is mounted into the
-container at `/data/ipfs` (the image's default repo path). The container
-runs as UID 1000:
+container at `/data/ipfs` (the image's default repo path). The container's
+`ipfs` user is **UID 1000**, and a bind mount enforces ownership by
+numeric UID — so the host directory must be owned by numeric `1000`:
 
 ```bash
 sudo mkdir -p /mnt/data/ipfs
 sudo chown 1000:1000 /mnt/data/ipfs
 sudo chmod 700 /mnt/data/ipfs
 ```
+
+> **Do NOT create a host `ipfs` system user** for the Docker path.
+> `useradd --system ipfs` allocates a UID from the 100–999 system range
+> (e.g. 999), which the container cannot read. The image brings its own
+> `ipfs` user (UID 1000); the host only needs the numeric ownership
+> above. On a standard fresh Ubuntu server install (Docker
+> `userns-remap` off, the default), this works as-is. If `userns-remap`
+> is enabled, container UID 1000 maps to a subordinate host UID and the
+> `chown` target must be that mapped range instead.
 
 ### Run the container
 
