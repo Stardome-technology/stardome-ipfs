@@ -14,16 +14,16 @@ ecosystem.
 
 | Feature | Detail |
 |---|---|
-| **Kubo version** | `v0.42.0` (Linux amd64) |
-| **Init profile** | `server` (`ipfs init --profile server`) |
-| **Service manager** | `systemd` with dedicated `ipfs` user, `PrivateTmp=yes`, `NoNewPrivileges=yes` |
-| **Data directory** | Dedicated partition at `/mnt/data/ipfs` via `IPFS_PATH` |
+| **Kubo version** | Official Docker image [`ipfs/kubo:latest`](https://hub.docker.com/r/ipfs/kubo) (pin `vN.N.N` to hold a release) |
+| **Init profile** | `server` (`IPFS_PROFILE=server` on first init) |
+| **Service manager** | Docker restart policy (`--restart unless-stopped`) |
+| **Data directory** | Host volume `/mnt/data/ipfs` → `/data/ipfs` in the container (UID 1000) |
 | **Storage cap** | 200 GB (`Datastore.StorageMax`) |
 | **GC interval** | 1 hour (`Datastore.GCPeriod`), enabled at daemon start (`--enable-gc`) |
 | **Relay** | Disabled (`Swarm.Transports.Network.Relay: false`, `Swarm.RelayClient.Enabled: false`) |
 | **Connection manager** | LowWater 100 / HighWater 200 |
 | **DHT provide interval** | 12 hours (`Provide.DHT.Interval: "12h"`) |
-| **API address** | `127.0.0.1:5001` (localhost only) |
+| **API address** | `127.0.0.1:5001` on the host loopback (host-network container) |
 | **Gateway** | Disabled (all HTTP served through Nginx reverse proxy) |
 | **Rate limiting** | Per-org via Nginx `limit_req_zone` (10 req/s, burst 20) |
 | **Auth layer** | SEAD auth stack — Nginx `auth_request` subrequest to the gateway |
@@ -136,6 +136,29 @@ CBOR map with:
 Token is **base64url-encoded** CBOR (`RFC 4648 §5`, no padding) and passed
 as `Authorization: Bearer <token>`.
 
+## Retrieval model (verification)
+
+This node is a **pinning backend, not a public content gateway**. The
+Nginx mapping intentionally exposes **only** `POST /api/v0/add` and
+`POST /api/v0/pin/add` (SEAD-token authenticated). Every other RPC —
+`cat`, `pin/ls`, `block/stat`, `id`, `version` — returns `403` by
+design.
+
+**Do not build verification flows that `cat` from the IPFS node.** The
+intended retrieval model for verifiers — whether internal SEAD components
+or external verifier parties — is:
+
+1. The attestation bytes come **from the signer** out-of-band, or via the
+   SEAD gateway's **controlled disclosure** (`POST /disclosure/request`).
+2. The verifier checks the attestation signature and binds it to the
+   `merkle_root` / CID recorded in the `edge_commit` event on the SEAD
+   DAG. Anyone holding the source data can verify the signature themselves.
+
+The `cat` path exists only as an **internal storage hop** (gateway →
+pin-service → Kubo over the trusted network) and is not part of this
+node's public contract. A `403` on `cat` is the correct, expected
+response — not a misconfiguration, and not "node down".
+
 ## SEAD Auth Stack
 
 Deploy the minimal auth stack alongside your IPFS node to validate
@@ -147,8 +170,10 @@ docker compose -f docker-compose.ipfs-auth.yml pull
 docker compose -f docker-compose.ipfs-auth.yml up -d
 
 # Health check
-curl http://localhost:30080/health    # gateway (auth/verify + proxy)
-curl http://localhost:32001/health    # pin-replicator
+# gateway (auth/verify + proxy)
+curl http://localhost:30080/health
+# pin-replicator
+curl http://localhost:32001/health
 ```
 
 > **Note:** The images are published as public packages on ghcr.io.
@@ -187,11 +212,22 @@ The `OrgGenesis` events must already be registered in
 `sead-core` from your existing SEAD deployment. Verify they are present:
 
 ```bash
+# This IPFS auth stack does NOT set SEAD_AUTH_SECRET (the gateway is
+# localhost-only; Nginx is the public auth enforcement point), so no
+# Authorization header is needed here.
 curl http://localhost:30080/orgs/<org_id_hex>
 # Expected: {"status":"active","org_pk_hex":"<pk>"}
 ```
 
 If not, follow the [sead-service bootstrap guide](https://github.com/Stardome-technology/sead-service/blob/main/docs/bootstrap-genesis.md) first.
+
+> **Note on the bootstrap guide's `Authorization` header:** the linked
+> `sead-service` bootstrap guide shows `-H "Authorization: Bearer $SEAD_AUTH_SECRET"`
+> because it targets a standalone gateway that sets `SEAD_AUTH_SECRET`. This IPFS
+> auth stack deliberately leaves that secret unset (see `docker-compose.ipfs-auth.yml`),
+> so the header is **not** required here. If you ever set `SEAD_AUTH_SECRET` on this
+> gateway (e.g. to expose it beyond localhost), add the header to the bootstrap
+> commands too.
 
 ## Token generation
 
@@ -230,6 +266,19 @@ curl -X POST \
   -F file=@signature.cbor \
   "https://ipfs.yourdomain.com/api/v0/add"
 ```
+
+### Client TLS trust (pin-service / integrator nodes)
+
+This node's `/api/v0/add` is served by Nginx with a **Let's Encrypt** (or any public CA) cert.
+A SEAD **pin-service** (Go, on an organization infrastructure) pins artifacts here
+over HTTPS and must trust the **public CA bundle** — it does **not** need your
+private CA. The pin-service uses Go's `net/http` client with a 60-second timeout
+and trusts the system CA bundle automatically — no explicit CA path configuration
+is needed.
+
+If you deploy this node behind a **private CA** instead of public one, configure
+the pin-service to trust that CA bundle (e.g. via `SSL_CERT_FILE` env var or
+system CA installation).
 
 ---
 
