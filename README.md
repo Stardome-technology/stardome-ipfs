@@ -219,10 +219,10 @@ curl http://localhost:30080/orgs/<org_id_hex>
 # Expected: {"status":"active","org_pk_hex":"<pk>"}
 ```
 
-If not, follow the [stardome-sead-private bootstrap guide](https://jumper-2.avril14th.org/stardome-cloud/stardome-sead-private/-/blob/main/docs/bootstrap-genesis.md) first.
+If not, follow the [stardome-sead bootstrap guide](https://github.com/Stardome-technology/stardome-sead/blob/main/docs/bootstrap-genesis.md) first.
 
 > **Note on the bootstrap guide's `Authorization` header:** the linked
-> `stardome-sead-private` bootstrap guide shows `-H "Authorization: Bearer $SEAD_AUTH_SECRET"`
+> `stardome-sead` bootstrap guide shows `-H "Authorization: Bearer $SEAD_AUTH_SECRET"`
 > because it targets a standalone gateway that sets `SEAD_AUTH_SECRET`. This IPFS
 > auth stack deliberately leaves that secret unset (see `docker-compose.ipfs-auth.yml`),
 > so the header is **not** required here. If you ever set `SEAD_AUTH_SECRET` on this
@@ -233,7 +233,7 @@ If not, follow the [stardome-sead-private bootstrap guide](https://jumper-2.avri
 
 The auth stack only verifies tokens — it never generates them. You need signed
 tokens from an existing SEAD org. The org operator generates them on a secure
-laptop using the `gen-token` tool (see [stardome-sead-private docs](https://jumper-2.avril14th.org/stardome-cloud/stardome-sead-private/-/blob/main/docs/bootstrap-genesis.md)):
+laptop using the `gen-token` tool (see [stardome-sead docs](https://github.com/Stardome-technology/stardome-sead/blob/main/docs/bootstrap-genesis.md)):
 
 ```bash
 # On the org's secure laptop (not the IPFS node):
@@ -253,10 +253,10 @@ Before deploying this auth stack, you must have:
 
 1. **A running SEAD org** — sead-core with registered `OrgGenesis` and `EdgeAuthorization` events
 2. **The org_id** — the organization identifier (hex) from keygen output
-3. **A way to generate tokens** — the `gen-token` tool (see [stardome-sead-private](https://jumper-2.avril14th.org/stardome-cloud/stardome-sead-private) docs) or an edge-service that holds the org signing key
+3. **A way to generate tokens** — the `gen-token` tool (see [stardome-sead](https://github.com/Stardome-technology/stardome-sead) docs) or an edge-service that holds the org signing key
 
 All of these come from an existing SEAD deployment. If you don't have them
-yet, follow the [stardome-sead-private bootstrap guide](https://jumper-2.avril14th.org/stardome-cloud/stardome-sead-private/-/blob/main/docs/bootstrap-genesis.md) first.
+yet, follow the [stardome-sead bootstrap guide](https://github.com/Stardome-technology/stardome-sead/blob/main/docs/bootstrap-genesis.md) first.
 
 ### Usage example
 
