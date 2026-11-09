@@ -229,6 +229,43 @@ If not, follow the [stardome-sead bootstrap guide](https://github.com/Stardome-t
 > gateway (e.g. to expose it beyond localhost), add the header to the bootstrap
 > commands too.
 
+### Revoking / rotating an org key
+
+When an org key is rotated or compromised, post an `org_key_revoke` event so
+this node stops accepting tokens signed by the old key. The envelope is
+**generated on the org's secure laptop** with the `gen-bootstrap` tool (signed
+by the current active org key) — full procedure and flags in the
+[stardome-sead Key revocation guide](https://github.com/Stardome-technology/stardome-sead/blob/main/docs/bootstrap-genesis.md#key-revocation).
+
+The **POST differs from the standalone-gateway guide** on this node: the IPFS
+auth stack's gateway is **localhost-only and plain HTTP** (Nginx terminates TLS
+publicly; the gateway itself does not), and it does **not** set
+`SEAD_AUTH_SECRET`. So use `http://` (not `https://`) and **no** `Authorization`
+header:
+
+```bash
+# Transfer org_revoke.hex to this node, then:
+curl -X POST http://localhost:30080/events \
+  -H "Content-Type: application/json" \
+  -d "{\"envelope_hex\": \"$(cat org_revoke.hex)\"}"
+# Expected: {"event_id":"<64-hex>","event_type":2,"event_type_name":"org_key_revoke","status":"accepted"}
+
+# Verify the old key is now inactive:
+curl -s http://localhost:30080/orgs/<old_org_id_hex>
+# Expected: {"status":"inactive", ...}
+```
+
+> Using `https://localhost:30080` here fails with
+> `SSL routines::wrong version number` — that is the plain-HTTP gateway being
+> spoken to as TLS, not a certificate problem. This stack sets no
+> `GATEWAY_TLS_ENABLED`, so the gateway serves plaintext on `:30080`.
+
+**Rotation ordering.** If the replacement org key has a **new** `org_id`
+(a fresh keypair), post the new genesis **first**, then revoke the old key —
+zero gap where the org is inactive for pinning. If you keep the **same**
+`org_id`, you must revoke **first**, then post the new genesis (the duplicate
+gate rejects a second active key for the same `org_id`).
+
 ## Token generation
 
 The auth stack only verifies tokens — it never generates them. You need signed
