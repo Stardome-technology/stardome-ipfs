@@ -302,6 +302,19 @@ The gateway needs to know your org's public key to verify tokens.
 Generate the genesis envelope on a **secure machine** (not the IPFS node),
 then POST it to the local sead-core via the gateway.
 
+#### Which registry events this node needs
+
+| Registry event | Required? | Rationale |
+|---|---|---|
+| `org_genesis` | **Required** | Token verification resolves the org key from it — without an active genesis, no token from this org verifies on this node. |
+| `edge_authorization` | **Optional for pinning** | Verification never checks the edge registry, so pinning works without it. **Recommended** when the node participates in a replicated DAG, so all replicas hold the same events and later replication cannot diverge. |
+| `org_key_revoke` + new genesis | **Required on key rotation** | Stops this node accepting tokens signed by the old key. See [Revoking / rotating an org key](README.md#revoking--rotating-an-org-key). |
+
+> **What verification actually checks:** the org key (resolved from
+> `org_genesis`) → signature → expiry/skew → scope → optional
+> audience/action and `payload_hash` bindings. The edge registry is **never**
+> consulted — this is why `edge_authorization` is optional for pinning here.
+
 #### Generate the envelope (on a secure machine)
 
 ```bash
