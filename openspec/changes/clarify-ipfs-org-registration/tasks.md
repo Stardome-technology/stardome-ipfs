@@ -7,9 +7,9 @@
 
 ## 2. Cross-links
 
-- [ ] 2.1 Link the matrix from the rotation/revoke section added in PR #19 (one line, no duplication).
+- [x] 2.1 Link the matrix from the rotation/revoke section added in PR #19 (one line, no duplication). (Landed in cb5eaf8: README.md §Revoking / rotating an org key links SETUP.md#which-registry-events-this-node-needs.)
 
 ## 3. Quality gate
 
 - [x] 3.1 `openspec validate clarify-ipfs-org-registration` passes.
-- [ ] 3.2 Commit on `feat/clarify-ipfs-org-registration`, push, open PR.
+- [x] 3.2 Commit on `feat/clarify-ipfs-org-registration`, push, open PR.
