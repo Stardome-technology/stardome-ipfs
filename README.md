@@ -231,6 +231,8 @@ If not, follow the [stardome-sead bootstrap guide](https://github.com/Stardome-t
 
 ### Revoking / rotating an org key
 
+For which registry events this node needs (including rotation), see the [registry-event matrix](SETUP.md#which-registry-events-this-node-needs).
+
 When an org key is rotated or compromised, post an `org_key_revoke` event so
 this node stops accepting tokens signed by the old key. The envelope is
 **generated on the org's secure laptop** with the `gen-bootstrap` tool (signed
