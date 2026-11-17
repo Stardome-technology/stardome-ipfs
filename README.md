@@ -70,10 +70,23 @@ nodes' IPs.
 
 ## What gets pinned to IPFS
 
-When an attestation flows through the SEAD pipeline, only the **raw
-`stardome_attestation` CBOR bytes** are pinned to IPFS. The Merkle tree
-and inclusion proof are **not** pinned — they are the integrator's
-responsibility to store separately.
+The SEAD pipeline uses a **two-CID model**:
+
+- **Artifact CID** — the raw `stardome_attestation` CBOR bytes. Always
+  pinned, exactly as before. This is the core pin.
+- **Tree CID** — the Merkle tree is **optionally** pinned as its own
+  separate object with its own CID. When the client supplies the tree at
+  ingest, the edge service pins it and records the tree CID as the
+  optional `tree_cid` field (key 96, `tstr`) on the `edge_commit` event
+  (schema `sead_v1.4.0.cddl`). Absent key 96 means "not pinned" — a
+  valid state; those integrators fall back to their own storage.
+
+The tree is never merged into the artifact container — that would change
+`payload_hash`/`event_id` and fork the DAG. The inclusion proof is not
+itself pinned; it is derived from the tree at verification time.
+
+Tree resolution path from replicated DAG state:
+`payload_hash → edge_commit (key 3) → tree CID (key 96) → IPFS retrieve`.
 
 ### Pin size breakdown
 
@@ -85,8 +98,8 @@ responsibility to store separately.
 | **Total attestation CBOR pinned** | **~22-25 KB** | ✅ **This is what IPFS stores** |
 | Edge-service commit signature (OID 0x12) | ~2.8 KB | ❌ Goes to sead-core event store |
 | Edge-service auth token signature (OID 0x12) | ~2.8 KB | ❌ Ephemeral auth header only |
-| Merkle tree file | ~varies | ❌ Integrator's responsibility |
-| Inclusion proof | ~varies | ❌ Integrator's responsibility |
+| Merkle tree file | ~varies | ⭕ Optional — separate pin with its own **tree CID** (key 96 on `edge_commit`) |
+| Inclusion proof | ~varies | ❌ Derived from the tree at verification time; not itself pinned |
 
 ### Pin format
 
@@ -113,13 +126,17 @@ stardome_attestation = {
   not from IPFS.
 - **Edge-service auth token signature** — generated per-pin, used as an
   HTTP `Authorization` header, then discarded. It is ephemeral by design.
-- **Merkle tree** — the tree is produced by `stardome-client` during
-  attestation but is intentionally **not** sent to the edge-service or
-  pinned. The integrator is responsible for storing the tree file if
-  they need full Merkle proof verification. The verifier currently
-  checks `merkle_root == commitment_root` without requiring the full tree.
-- **Inclusion proof** — derived from the tree at verification time.
-  Not pinned because the tree itself is not pinned.
+- **Merkle tree (when not supplied)** — the tree is produced by
+  `stardome-client` during attestation and is **optionally** sent to the
+  edge-service. If supplied, it is pinned under its own tree CID and
+  resolvable from the DAG (`payload_hash → edge_commit → tree_cid`). If
+  not supplied, the tree is not pinned and the integrator stores the
+  tree file themselves if they need full Merkle proof verification.
+  Either way, the verifier checks `merkle_root == commitment_root`
+  without requiring the full tree.
+- **Inclusion proof** — derived from the tree at verification time; not
+  itself pinned. When the tree was pinned, it can be retrieved via the
+  tree CID recorded on the DAG.
 
 ### Token format
 
