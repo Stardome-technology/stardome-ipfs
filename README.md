@@ -176,6 +176,41 @@ curl http://localhost:30080/health
 curl http://localhost:32001/health
 ```
 
+### Upgrading an existing node to the v0.1.0 images
+
+From `v0.1.0` every image runs as `sead`, uid and gid `10001`. Older images ran
+`sead-core` as uid `100` / gid `101` and `pin-replicator` as `100:101` too, and
+both write into the same `sead_data` volume. Because every service drops all
+capabilities, the new images cannot read or write files the old user owns — and
+the old images cannot read files `10001` owns.
+
+So change the volume's owner **in the same step as the switch to the `v0.1.0`
+images, with the stack stopped, never before**:
+
+```bash
+# 1. Stop the stack, keeping the volume.
+docker compose -f docker-compose.ipfs-auth.yml down
+
+# 2. Relabel the volume contents to the image user. The host usually has no
+#    `sead` user, so use the numeric ids.
+VOL="$(docker volume inspect stardome-ipfs_sead_data -f '{{.Mountpoint}}')"
+sudo chown -R 10001:10001 "$VOL"
+sudo ls -ln "$VOL"          # every entry must read 10001 10001
+
+# 3. Start the stack and check both services.
+docker compose -f docker-compose.ipfs-auth.yml up -d
+docker compose -f docker-compose.ipfs-auth.yml ps
+```
+
+If `sead-core` exits at start with a SQLite `unable to open database file` or
+`permission denied`, step 2 did not cover the file — re-run it and check the
+ownership of `sead.db` and its `-wal`/`-shm` sidecars.
+
+> **Volume name.** The compose file sets `name: stardome-ipfs`, so the volume is
+> always `stardome-ipfs_sead_data` regardless of the directory the clone sits
+> in. A node deployed before that line existed may have a volume named after its
+> clone directory — check with `docker volume ls` before relabelling.
+
 > **Note:** The images are published as public packages on ghcr.io.
 > However, some Docker environments may still return `denied` on anonymous pulls.
 > If you get an error, log in with a GitHub PAT first:
