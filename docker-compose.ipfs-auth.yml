@@ -2,6 +2,17 @@
 # Usage:
 #   docker compose -f docker-compose.ipfs-auth.yml up -d
 #
+# Images are pinned as <tag>@sha256:<digest> — a release tag plus the digest of
+# the multi-arch index ghcr.io serves for it — so a node runs that build until
+# the pin is bumped here. Do not switch back to :latest: the tag moves with
+# every publish, and from v0.1.0 the images run as `sead` (uid/gid 10001),
+# which changes what they can read and write on the host.
+#
+# Bump both the tag and the digest together:
+#   docker buildx imagetools inspect \
+#     ghcr.io/stardome-technology/stardome-sead/sead-core:0.1.0
+# and take the `Digest:` line under `Name:`, not a per-platform digest.
+#
 # Bootstrap:
 #   1. Register OrgGenesis event:
 #      curl -X POST http://localhost:30080/events \
@@ -20,9 +31,15 @@
 # to it. The pin-replicator runs with host networking to reach Kubo on
 # 127.0.0.1:5001.
 
+# A fixed project name, so the volume name does not depend on the directory the
+# clone happens to sit in. Without it Compose derives the project from the
+# directory name, and a differently-named clone silently gets a different
+# `sead_data` volume — an empty database, not an error.
+name: stardome-ipfs
+
 services:
   sead-core:
-    image: ghcr.io/stardome-technology/stardome-sead/sead-core:latest
+    image: ghcr.io/stardome-technology/stardome-sead/sead-core:0.1.0@sha256:49bf9b7c2b462de6458a3b3d9280414a2a195eb768a17a9ece8b3b269dab0a17
     # No public ports — gRPC-only, reachable on sead-network via the gateway
     volumes:
       - sead_data:/data
@@ -39,7 +56,7 @@ services:
       - sead-network
 
   gateway:
-    image: ghcr.io/stardome-technology/stardome-sead-gateway:latest
+    image: ghcr.io/stardome-technology/stardome-sead-gateway:0.1.0@sha256:5f9046952a2f3c7bd789996ef8c473659d53973447da099111a4b66ce185414f
     ports:
       - "127.0.0.1:30080:30080"
     environment:
@@ -70,7 +87,13 @@ services:
       sead-core:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:30080/health"]
+      # The v0.1.0 image dropped `wget` (change gateway-healthcheck-subcommand),
+      # so a wget-based probe can never pass and the container stays unhealthy
+      # forever. The gateway's own subcommand loads the same config the server
+      # loads, so it follows GATEWAY_TLS_ENABLED (false here) and
+      # GATEWAY_LISTEN_ADDR. Exit codes are a stable contract: 0 healthy,
+      # 3 listener down, 4 backends unreachable, 5 draining.
+      test: ["CMD", "/app/gateway", "healthcheck"]
       interval: 15s
       timeout: 5s
       retries: 3
